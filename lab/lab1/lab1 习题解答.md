@@ -487,7 +487,49 @@ entry.S : 77 处初始化栈寄存器 esp，此时栈顶指针指向高地址端
 
 > 熟悉x86平台上的C语言的函数调用规则，找到 obj/kernel.asm 中 test_backtrace() 函数的地址，并在此处设置断点，并检查内核启动后每次调用该函数都发生了什么。在test_backtrace（） 的每次递归调用中，在栈上推入了几个4字节的数据，这些数据分别是什么？
 
+先在kern/init.c 的i386_init（）函数中增添一个函数体为空的函数，查看该函数进出期间的栈上变化。
 
+函数内容如下所示：
+
+```c
+mon_backtrace(1, 0, 0);   // 调用
+    
+int mon_backtrace(int argc, char **argv, struct Trapframe *tf)   // 定义
+{
+	return 0;
+}
+```
+
+
+
+```shell
+=> 0xf0100136 <i386_init+144>:	push   $0x0           # 函数第三个参数入栈
+
+=> 0xf0100138 <i386_init+146>:	push   $0x0
+
+=> 0xf010013a <i386_init+148>:	push   $0x1			# 第一个参数入栈
+
+=> 0xf010013c <i386_init+150>:	call   0xf01008d0 <mon_backtrace>  
+# eip值入栈，入栈值为原流程中的该指令的后一条指令的地址值
+
+=> 0xf01008d0 <mon_backtrace>:	push   %ebp			# 前一函数的栈基址入栈
+	
+=> 0xf01008d1 <mon_backtrace+1>:	mov    %esp,%ebp # 将当前栈地址赋给 ebp 
+
+=> 0xf01008d3 <mon_backtrace+3>:	mov    $0x0,%eax
+
+=> 0xf01008d8 <mon_backtrace+8>:	pop    %ebp       # 弹出迁移函数的基址值给 ebp
+
+=> 0xf01008d9 <mon_backtrace+9>:	ret    			# 函数调用结束，从栈中取出eip值
+
+=> 0xf0100141 <i386_init+155>:	add    $0x10,%esp
+
+=> 0xf0100144 <i386_init+158>:	sub    $0xc,%esp
+
+=> 0xf0100147 <i386_init+161>:	push   $0x0
+```
+
+在该函数的调用中栈上push 入 4 个4字节数据（3个函数参数，一个前一函数的栈基址），1个2字节数据（call指令中push入的eip值，为函数调用结束后要执行的指令地址）。
 
 
 
@@ -495,23 +537,89 @@ entry.S : 77 处初始化栈寄存器 esp，此时栈顶指针指向高地址端
 
 > 按照要求补全mon_backtrace函数。使用 `make grade` 命令查看分数。
 
+详见 lab1 代码。
 
 
 
+#### Exercise 11.
+
+> 修改栈回溯函数，对于每个 eip ， 增加函数名称，源文件名和行号。
+>
+> 在 `debuginfo_eip` 中，`__STAB_*` 是来自哪里的？
+>
+> 通过插入 `stab_binsearch()` 函数的调用，找到对应每个 eip 地址的行号，完善 `debuginfo_eip（）` 函数的实现 。
+>
+> 向内核的 monitor 增加一个backtrace 函数，扩展 `mon_backtrace`  的实现通过调用 `debuginfo_eip` 来打印如下所示的栈信息：
+>
+> ```
+> K> backtrace
+> Stack backtrace:
+>   ebp f010ff78  eip f01008ae  args 00000001 f010ff8c 00000000 f0110580 00000000
+>          kern/monitor.c:143: monitor+106
+>   ebp f010ffd8  eip f0100193  args 00000000 00001aac 00000660 00000000 00000000
+>          kern/init.c:49: i386_init+59
+>   ebp f010fff8  eip f010003d  args 00000000 00000000 0000ffff 10cf9a00 0000ffff
+>          kern/entry.S:70: <unknown>+0
+> K> 
+> ```
+
+stab的参考资料可查看这个链接。http://www.math.utah.edu/docs/info/stabs_1.html
 
 
 
+backtrace 函数的实现步骤：
+
+在debuginfo_eip z中加入如下两行代码，
+
+```c
+stab_binsearch(stabs, &lline, &rline, N_SLINE, addr);
+info->eip_line = stabs[lline].n_desc;
+```
 
 
 
+在monitor.h 和 .c 中增加 backtrace 函数的声明和实现：
 
+```c
+int backtrace(int argc, char **argv, struct Trapframe *tf)
+{
+    cprintf("Stack backtrace:\n");
+    uint32_t *ebp = (uint32_t *)read_ebp();
+    while (ebp)
+    {
+        cprintf("ebp %08x  eip %08x  args %08x %08x %08x %08x %08x\n",
+                ebp,
+                *(ebp + 1),
+                *(ebp + 2),
+                *(ebp + 3),
+                *(ebp + 4),
+                *(ebp + 5),
+                *(ebp + 6));
+        struct Eipdebuginfo eip_info;
+        debuginfo_eip(*(ebp + 1), &eip_info);
+        cprintf("\t%s:%d: %.*s+%d\n", 
+                    eip_info.eip_file, eip_info.eip_line, 
+                    eip_info.eip_fn_namelen, eip_info.eip_fn_name, 
+                    *(ebp+1) - eip_info.eip_fn_addr);
+        ebp = (uint32_t *)*ebp;
+    }
+    return 0;
+}
+```
 
+修改 test_backtrace 函数：
 
-
-
-
-
-
+```c
+void test_backtrace(int x)
+{
+	cprintf("entering test_backtrace %d\n", x);
+	if (x > 0)
+		test_backtrace(x-1);
+	else
+        backtrace(0, 0, 0);
+	cprintf("leaving test_backtrace %d\n", x);
+}
+```
 
 
 
