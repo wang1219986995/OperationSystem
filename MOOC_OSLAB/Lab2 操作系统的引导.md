@@ -1,13 +1,13 @@
 # 操作系统的引导
 
+## 1 实验介绍
+
 **实验目的：**
 
 - 熟悉 hit-oslab 实验环境；
 - 建立对操作系统引导过程的深入认识；
 - 掌握操作系统的基本开发过程；
 - 能对操作系统代码进行简单的控制，揭开操作系统的神秘面纱。
-
-
 
 
 
@@ -36,3 +36,178 @@
 在实验报告中回答如下问题：
 
 1. 有时，继承传统意味着别手蹩脚。x86 计算机为了向下兼容，导致启动过程比较复杂。请找出 x86 计算机启动过程中，被硬件强制，软件必须遵守的两个“多此一举”的步骤（多找几个也无妨），说说它们为什么多此一举，并设计更简洁的替代方案。
+
+
+
+
+## 2 实验完成步骤
+
+完整版代码详见实验代码的lab2 分支。
+
+### 2.1 改写 bootsect.s
+
+首先，修改 boot/bootsect.s 中的如下内容：
+
+```assembly
+msg1:
+    .byte 13,10
+    .ascii "Loading system ..."   ;将这里的字符串修改成自己想要的样子
+    .byte 13,10,13,10
+```
+
+
+
+修改下述代码段：
+
+```assembly
+! Print some inane message
+
+	mov	ah,#0x03		! read cursor pos
+	xor	bh,bh
+	int	0x10
+	
+	mov	cx,#30			!这里的数值要修改为字符串的长度 + 6
+	mov	bx,#0x0007		! page 0, attribute 7 (normal)
+	mov	bp,#msg1
+	mov	ax,#0x1301		! write string, move cursor
+	int	0x10
+```
+
+
+
+### 2.2 改写 stepup.s
+
+
+
+首先新增如下定义：
+
+```assembly
+msg1:
+	.byte 13,10
+	.ascii "Now we are in SETUP"
+	.byte 13,10,13,10
+msg_pos:
+    .byte 13,10
+    .ascii "Cursor POS:"
+msg_mem:
+    .byte 13,10
+    .ascii "Memory SIZE:"
+msg_cyl:
+    .byte 13,10
+    .ascii "Cyls:"
+msg_head:
+    .byte 13,10
+    .ascii "Heads:"
+msg_sectors:
+    .byte 13,10
+    .ascii "Sectors:"
+```
+
+随后，编写命令，打印各项参数：
+
+```assembly
+! Check that there IS a hd1 :-)
+print_hard_message:
+
+! init ss:sp
+    mov ax,#INITSEG
+    mov ss,ax
+    mov sp,#0xFF00
+
+! Cursor pos
+    mov ax, #SETUPSEG	;这里是将数据段地址设为字符串所在的段
+    mov es, ax
+    mov ds, ax
+	mov	cx,#13			;打印 Cursor POS:
+	mov	bx,#0x0007	
+	mov	bp,#msg_pos
+	mov	ax,#0x1301
+	int	0x10			;调用BIOS中断，打印字符
+
+    mov ax, #INITSEG	  ;这里切换为 0x90000 所在的段，准备打印硬件参数
+    mov es, ax
+    mov ds, ax
+    mov dx, [0]			; 将ds:[0] 内存出的值存入dx寄存器
+    call print_hex		; 调用函数打印dx中的值
+
+! Memory
+    mov ax, #SETUPSEG
+    mov es, ax
+    mov ds, ax
+
+	mov	cx,#14
+	mov	bx,#0x0007	
+	mov	bp,#msg_mem
+	mov	ax,#0x1301
+	int	0x10
+
+    mov ax, #INITSEG
+    mov es, ax
+    mov ds, ax
+    mov dx, [2]
+    call print_hex
+! Cyles
+    mov ax, #SETUPSEG
+    mov es, ax
+    mov ds, ax
+
+	mov	ah,#0x03		! read cursor pos
+	xor	bh,bh
+	int	0x10
+
+	mov	cx,#7
+	mov	bx,#0x0007	
+	mov	bp,#msg_cyl
+	mov	ax,#0x1301
+	int	0x10
+
+    mov ax, #INITSEG
+    mov es, ax
+    mov ds, ax
+    mov dx, [4]
+    call print_hex
+!Heads
+    mov ax, #SETUPSEG
+    mov es, ax
+    mov ds, ax	
+
+    mov	ah,#0x03
+	xor	bh,bh
+	int	0x10
+
+	mov	cx,#8
+	mov	bx,#0x0007	
+	mov	bp,#msg_head
+	mov	ax,#0x1301
+	int	0x10
+
+    mov ax, #INITSEG
+    mov es, ax
+    mov ds, ax
+    mov dx, [6]
+    call print_hex
+
+!Secotrs
+    mov ax, #SETUPSEG
+    mov es, ax
+    mov ds, ax
+
+    mov	ah,#0x03
+	xor	bh,bh
+	int	0x10
+
+	mov	cx,#10
+	mov	bx,#0x0007	
+	mov	bp,#msg_sectors
+	mov	ax,#0x1301
+	int	0x10
+
+    mov ax, #INITSEG
+    mov es, ax
+    mov ds, ax
+    mov dx, [12]
+    call print_hex
+```
+
+
+
