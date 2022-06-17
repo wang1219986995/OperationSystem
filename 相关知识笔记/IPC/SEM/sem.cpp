@@ -28,6 +28,7 @@ bool read_line(int fd, char* buf)
 }
 
 
+
 void child_func()
 {
     cout << "This is child process function, created to consumer." <<  endl;
@@ -60,6 +61,14 @@ void parent_func()
         sem_post(&full);
         sem_post(&mutex);
     }
+//    sem_wait(&mutex);
+//    sem_wait(&empty);
+    for(int i = 0; i < MAX_SIZE; i++)
+    {
+        //write(fd_w, )
+    }
+
+
 }
 
 
