@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="PublishConfigData" remoteFilesAllowedToDisappearOnAutoupload="false">
+    <serverData>
+      <paths name="10.15.59.192 (2f65152b-b174-461c-8ece-c471e0ca7531)">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/tmp/IPC" local="$PROJECT_DIR$" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="CompanyQNX (a5ebeead-a52b-4e18-898c-afa7219fc189)">
+        <serverdata>
+          <mappings>
+            <mapping local="$PROJECT_DIR$" web="/" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="TXLinux (ccda930b-eef4-4276-a191-eb5f95faa5de)">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/tmp/tmp.kCAtPGhiLm" local="$PROJECT_DIR$" />
+          </mappings>
+          <excludedPaths>
+            <excludedPath local="true" path="$PROJECT_DIR$/cmake-build-debug-txlinux" />
+            <excludedPath local="true" path="$PROJECT_DIR$/cmake-build-debug-txlinux" />
+          </excludedPaths>
+        </serverdata>
+      </paths>
+    </serverData>
+  </component>
+</project>
